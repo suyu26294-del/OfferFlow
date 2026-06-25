@@ -1,0 +1,40 @@
+{
+  "name": "offerflow",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:sqlite": "node -e \"require('fs').copyFileSync('prisma/schema.sqlite.prisma','prisma/schema.prisma');require('fs').copyFileSync('.env.sqlite','.env')\" && prisma generate && echo Switched to SQLite (local dev)",
+    "db:pg": "node -e \"require('fs').copyFileSync('prisma/schema.pg.prisma','prisma/schema.prisma');require('fs').copyFileSync('.env.pg','.env')\" && prisma generate && echo Switched to PostgreSQL (Vercel deploy)"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "@tailwindcss/postcss": "^4.3.0",
+    "@vercel/blob": "^2.4.0",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.3",
+    "mammoth": "^1.12.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^3.8.1",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "playwright": "^1.60.0",
+    "prisma": "^6.5.0"
+  }
+}
