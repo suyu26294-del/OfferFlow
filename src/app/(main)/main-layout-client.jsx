@@ -3,7 +3,6 @@
 import Navbar from '@/components/Navbar'
 import Sidebar from '@/components/Sidebar'
 import BottomNav from '@/components/BottomNav'
-import Toast from '@/components/Toast'
 import { useTheme } from '@/store/ThemeContext'
 import { useApp } from '@/store/AppContext'
 
@@ -35,7 +34,6 @@ export default function MainLayoutClient({ children }) {
         </main>
       </div>
       <BottomNav />
-      <Toast />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import { generateMockData, defaultSettings } from './mockData'
 import { normalizeScoringConfig } from '../lib/jobScoring'
 import { deleteReviewAttachmentsByReviewId } from '../utils/reviewAttachmentStore'
@@ -8,6 +8,7 @@ import Toast from '../components/Toast'
 import { useAuth } from './AuthContext'
 
 const AppContext = createContext(null)
+const ToastContext = createContext(null)
 
 const ROUND_ORDER = ['一面', '二面', '三面', '终面']
 const STATUS_ROUND_MAP = { '一面中': '一面', '二面中': '二面', '三面中': '三面', '终面中': '终面' }
@@ -160,6 +161,7 @@ export function AppProvider({ children }) {
   const [resumes, setResumesRaw] = useState([])
   const [tasks, setTasksRaw] = useState([])
   const [reviews, setReviewsRaw] = useState([])
+  const [projectDocs, setProjectDocsRaw] = useState([])
   const [settings, setSettingsRaw] = useState(() => {
     if (typeof window === 'undefined') return defaultSettings
     return normalizeSettings(loadFromStorage('offerFlow_settings', defaultSettings))
@@ -184,11 +186,12 @@ export function AppProvider({ children }) {
   async function loadAllData() {
     setDataLoading(true)
     try {
-      let [j, r, t, rv, remoteSettings] = await Promise.all([
+      let [j, r, t, rv, pdocs, remoteSettings] = await Promise.all([
         apiFetch('/api/jobs'),
         apiFetch('/api/resumes'),
         apiFetch('/api/tasks'),
         apiFetch('/api/reviews'),
+        apiFetch('/api/project-docs'),
         apiFetch('/api/settings'),
       ])
 
@@ -196,6 +199,7 @@ export function AppProvider({ children }) {
       setResumesRaw(r)
       setTasksRaw(t)
       setReviewsRaw(rv)
+      setProjectDocsRaw(pdocs)
 
       const nextSettings = normalizeSettings(remoteSettings || loadFromStorage(settingsStorageKey(user?.id), defaultSettings))
       setSettingsRaw(nextSettings)
@@ -205,6 +209,7 @@ export function AppProvider({ children }) {
       saveToStorage('offerFlow_resumes', r)
       saveToStorage('offerFlow_tasks', t)
       saveToStorage('offerFlow_reviews', rv)
+      saveToStorage('offerFlow_projectDocs', pdocs)
     } catch (err) {
       // If unauthorized, just show empty data instead of falling
       // back to a potentially stale localStorage from another user.
@@ -213,6 +218,7 @@ export function AppProvider({ children }) {
         setResumesRaw([])
         setTasksRaw([])
         setReviewsRaw([])
+        setProjectDocsRaw([])
         const nextSettings = normalizeSettings(loadFromStorage('offerFlow_settings', defaultSettings))
         setSettingsRaw(nextSettings)
       } else {
@@ -223,6 +229,7 @@ export function AppProvider({ children }) {
         setResumesRaw(loadFromStorage('offerFlow_resumes', mock.resumes))
         setTasksRaw(loadFromStorage('offerFlow_tasks', mock.tasks))
         setReviewsRaw(loadFromStorage('offerFlow_reviews', mock.reviews))
+        setProjectDocsRaw(loadFromStorage('offerFlow_projectDocs', []))
         setSettingsRaw(normalizeSettings(loadFromStorage(settingsStorageKey(user?.id), defaultSettings)))
       }
     } finally {
@@ -264,6 +271,14 @@ export function AppProvider({ children }) {
     })
   }, [])
 
+  const setProjectDocs = useCallback((value) => {
+    setProjectDocsRaw((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      saveToStorage('offerFlow_projectDocs', next)
+      return next
+    })
+  }, [])
+
   // ---- Async CRUD methods ----
 
   // Jobs
@@ -279,22 +294,39 @@ export function AppProvider({ children }) {
   }, [setJobs, addToast])
 
   const updateJob = useCallback(async (id, patch) => {
+    let previousJobs = null
+    setJobs((prev) => {
+      previousJobs = prev
+      return prev.map((j) => j.id === id ? syncInterviewRounds({ ...j, ...patch }) : j)
+    })
+
     try {
       await apiFetch('/api/jobs', { method: 'PUT', body: JSON.stringify({ id, ...patch }) })
-      setJobs((prev) => prev.map((j) => j.id === id ? syncInterviewRounds({ ...j, ...patch }) : j))
+      return true
     } catch (err) {
+      if (previousJobs) setJobs(previousJobs)
       addToast(err.message, 'error')
+      return false
     }
   }, [setJobs, addToast])
 
   const deleteJob = useCallback(async (ids) => {
     const idList = Array.isArray(ids) ? ids : [ids]
-    if (!idList.length) return
+    if (!idList.length) return false
+
+    let previousJobs = null
+    setJobs((prev) => {
+      previousJobs = prev
+      return prev.filter((j) => !idList.includes(j.id))
+    })
+
     try {
       await apiFetch('/api/jobs', { method: 'DELETE', body: JSON.stringify({ ids: idList }) })
-      setJobs((prev) => prev.filter((j) => !idList.includes(j.id)))
+      return true
     } catch (err) {
+      if (previousJobs) setJobs(previousJobs)
       addToast(err.message, 'error')
+      return false
     }
   }, [setJobs, addToast])
 
@@ -311,11 +343,19 @@ export function AppProvider({ children }) {
   }, [setResumes, addToast])
 
   const updateResume = useCallback(async (id, patch) => {
+    let previousResumes = null
+    setResumes((prev) => {
+      previousResumes = prev
+      return prev.map((r) => r.id === id ? { ...r, ...patch } : r)
+    })
+
     try {
       await apiFetch('/api/resumes', { method: 'PUT', body: JSON.stringify({ id, ...patch }) })
-      setResumes((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r))
+      return true
     } catch (err) {
+      if (previousResumes) setResumes(previousResumes)
       addToast(err.message, 'error')
+      return false
     }
   }, [setResumes, addToast])
 
@@ -341,11 +381,19 @@ export function AppProvider({ children }) {
   }, [setTasks, addToast])
 
   const updateTask = useCallback(async (id, patch) => {
+    let previousTasks = null
+    setTasks((prev) => {
+      previousTasks = prev
+      return prev.map((t) => t.id === id ? { ...t, ...patch } : t)
+    })
+
     try {
       await apiFetch('/api/tasks', { method: 'PUT', body: JSON.stringify({ id, ...patch }) })
-      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t))
+      return true
     } catch (err) {
+      if (previousTasks) setTasks(previousTasks)
       addToast(err.message, 'error')
+      return false
     }
   }, [setTasks, addToast])
 
@@ -405,48 +453,124 @@ export function AppProvider({ children }) {
     }
   }, [setReviews, addToast])
 
+
+  // Project docs
+  const addProjectDoc = useCallback(async (formData) => {
+    const optimisticId = formData.id || crypto.randomUUID()
+    try {
+      const optimistic = { ...formData, id: optimisticId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      setProjectDocs((prev) => [optimistic, ...prev])
+      const result = await apiFetch('/api/project-docs', { method: 'POST', body: JSON.stringify({ ...formData, id: optimisticId }) })
+      setProjectDocs((prev) => prev.map((p) => p.id === optimisticId ? result.projectDoc : p))
+      return result.projectDoc
+    } catch (err) {
+      setProjectDocs((prev) => prev.filter((p) => p.id !== optimisticId))
+      addToast(err.message, 'error')
+      return null
+    }
+  }, [setProjectDocs, addToast])
+
+  const updateProjectDoc = useCallback(async (id, patch) => {
+    let previous = null
+    setProjectDocs((prev) => {
+      previous = prev
+      return prev.map((p) => p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p)
+    })
+    try {
+      const result = await apiFetch('/api/project-docs', { method: 'PUT', body: JSON.stringify({ id, ...patch }) })
+      setProjectDocs((prev) => prev.map((p) => p.id === id ? result.projectDoc : p))
+      return true
+    } catch (err) {
+      if (previous) setProjectDocs(previous)
+      addToast(err.message, 'error')
+      return false
+    }
+  }, [setProjectDocs, addToast])
+
+  const deleteProjectDoc = useCallback(async (id) => {
+    let previous = null
+    setProjectDocs((prev) => {
+      previous = prev
+      return prev.filter((p) => p.id !== id)
+    })
+    try {
+      await apiFetch(`/api/project-docs?id=${id}`, { method: 'DELETE' })
+      return true
+    } catch (err) {
+      if (previous) setProjectDocs(previous)
+      addToast(err.message, 'error')
+      return false
+    }
+  }, [setProjectDocs, addToast])
+
   // Settings: local cache + account-level persistence when logged in
   const setSettings = useCallback((value) => {
-    setSettingsRaw((prev) => {
-      const next = normalizeSettings(typeof value === 'function' ? value(prev) : value)
-      saveToStorage(settingsStorageKey(user?.id), next)
-      if (!user?.id) saveToStorage('offerFlow_settings', next)
+    const next = normalizeSettings(typeof value === 'function' ? value(settings) : value)
+    setSettingsRaw(next)
+    saveToStorage(settingsStorageKey(user?.id), next)
+    if (!user?.id) saveToStorage('offerFlow_settings', next)
 
-      if (user?.id) {
-        apiFetch('/api/settings', {
-          method: 'PUT',
-          body: JSON.stringify({ settings: next }),
-        }).catch((err) => {
-          console.error('[AppContext] settings persistence failed', err)
-          addToast('设置已保存到本地，但同步到账户失败', 'error')
-        })
-      }
-      return next
-    })
-  }, [user?.id, addToast])
+    if (user?.id) {
+      apiFetch('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings: next }),
+      }).catch((err) => {
+        console.error('[AppContext] settings persistence failed', err)
+        addToast('设置已保存到本地，但同步到账户失败', 'error')
+      })
+    }
+  }, [settings, user?.id, addToast])
+
+  const appValue = useMemo(() => ({
+    jobs, setJobs,
+    resumes, setResumes,
+    tasks, setTasks,
+    reviews, setReviews,
+    projectDocs, setProjectDocs,
+    addJob, updateJob, deleteJob,
+    addResume, updateResume, deleteResume,
+    addTask, updateTask, deleteTask,
+    addReview, updateReview, deleteReview,
+    addProjectDoc, updateProjectDoc, deleteProjectDoc,
+    settings, setSettings,
+    addToast,
+    dataLoading,
+  }), [
+    jobs, setJobs,
+    resumes, setResumes,
+    tasks, setTasks,
+    reviews, setReviews,
+    projectDocs, setProjectDocs,
+    addJob, updateJob, deleteJob,
+    addResume, updateResume, deleteResume,
+    addTask, updateTask, deleteTask,
+    addReview, updateReview, deleteReview,
+    addProjectDoc, updateProjectDoc, deleteProjectDoc,
+    settings, setSettings,
+    addToast,
+    dataLoading,
+  ])
+
+  const toastValue = useMemo(() => ({ toasts }), [toasts])
 
   return (
-    <AppContext.Provider value={{
-      jobs, setJobs,
-      resumes, setResumes,
-      tasks, setTasks,
-      reviews, setReviews,
-      addJob, updateJob, deleteJob,
-      addResume, updateResume, deleteResume,
-      addTask, updateTask, deleteTask,
-      addReview, updateReview, deleteReview,
-      settings, setSettings,
-      toasts, addToast,
-      dataLoading,
-    }}>
-      {children}
-      <Toast />
-    </AppContext.Provider>
+    <ToastContext.Provider value={toastValue}>
+      <AppContext.Provider value={appValue}>
+        {children}
+        <Toast />
+      </AppContext.Provider>
+    </ToastContext.Provider>
   )
 }
 
 export function useApp() {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('useApp must be used within AppProvider')
+  return ctx
+}
+
+export function useToasts() {
+  const ctx = useContext(ToastContext)
+  if (!ctx) throw new Error('useToasts must be used within AppProvider')
   return ctx
 }

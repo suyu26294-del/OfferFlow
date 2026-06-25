@@ -7,7 +7,7 @@ import ResumePreviewModal from '../components/ResumePreviewModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Resumes() {
-  const { jobs, resumes, addToast, deleteResume } = useApp()
+  const { jobs, resumes, projectDocs, addToast, deleteResume } = useApp()
 
   const [search, setSearch] = useState('')
   const [activeTag, setActiveTag] = useState('全部')
@@ -30,7 +30,8 @@ export default function Resumes() {
       if (activeTag !== '全部' && !r.tags?.includes(activeTag)) return false
       if (search) {
         const q = search.toLowerCase()
-        if (!r.name.toLowerCase().includes(q) && !(r.target || '').toLowerCase().includes(q)) return false
+        const text = [r.name, r.target, r.scenario, r.targetCompanies, r.targetJobTypes, r.coreSkills, r.jdKeywords, r.deliveryStrategy].filter(Boolean).join(' ').toLowerCase()
+        if (!text.includes(q)) return false
       }
       return true
     })
@@ -176,6 +177,24 @@ export default function Resumes() {
                   <span className="bg-offer-primary/10 text-offer-accent px-2 py-0.5 rounded-full truncate max-w-[140px]">{r.target || '通用'}</span>
                   <span>{r.updatedAt}</span>
                 </div>
+
+
+                {(r.scenario || r.targetJobTypes || r.coreSkills) && (
+                  <div className="mt-2 space-y-1">
+                    {r.scenario && <p className="text-[11px] text-purple-300/80 line-clamp-1">场景：{r.scenario}</p>}
+                    {r.targetJobTypes && <p className="text-[11px] text-cyan-300/80 line-clamp-1">岗位：{r.targetJobTypes}</p>}
+                    {r.coreSkills && <p className="text-[11px] text-offer-muted line-clamp-1">技能：{r.coreSkills}</p>}
+                  </div>
+                )}
+
+                {Array.isArray(r.linkedProjectIds) && r.linkedProjectIds.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {r.linkedProjectIds.slice(0, 3).map((id) => {
+                      const project = projectDocs.find((p) => p.id === id)
+                      return project ? <span key={id} className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">{project.title}</span> : null
+                    })}
+                  </div>
+                )}
 
                 {/* Version note */}
                 {r.versionNote && (

@@ -4,6 +4,7 @@ import { useApp } from '../store/AppContext'
 import ModalHeader from './ModalHeader'
 import GlowCard from './GlowCard'
 import { evaluateJob, getDimensionLabel, getScoreBadgeClass } from '../lib/jobScoring'
+import { llmHeadersFromStorage } from '../lib/clientLlmConfig'
 
 const STATUS_ACTIONS = [
   { status: '已投递', label: '已投递', color: 'border-cyan-200 text-cyan-700 dark:text-cyan-300 bg-cyan-50 hover:bg-cyan-100' },
@@ -34,12 +35,14 @@ function todayStr() {
 }
 
 export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete }) {
-  const { jobs, resumes, settings, addToast, updateJob, addTask, addReview } = useApp()
+  const { jobs, resumes, projectDocs, settings, addToast, updateJob, addTask, addReview } = useApp()
   const job = jobs.find((j) => j.id === jobId)
 
   // Sub-dialog state
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
 
   const [taskForm, setTaskForm] = useState({ title: '', type: '其他', date: todayStr(), startTime: '', notes: '' })
   const [reviewForm, setReviewForm] = useState({ interviewDate: todayStr(), round: '一面', interviewType: '技术面', result: '待定', duration: '', interviewerInfo: '', rating: 3, note: '', strengths: '', weaknesses: '' })
@@ -56,6 +59,28 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
 
   const resumeName = resumes.find((r) => r.id === job.resumeId)
   const scoreAnalysis = evaluateJob(job, settings)
+
+
+  const runJdAnalysis = async () => {
+    if (aiLoading) return
+    setAiLoading(true)
+    setAiResult(null)
+    try {
+      const res = await fetch('/api/ai/jd-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...llmHeadersFromStorage() },
+        body: JSON.stringify({ jobId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'AI JD 分析失败')
+      setAiResult(data.analysis)
+      addToast(data.analysis?.mode === 'ai' ? 'AI JD 分析完成' : '已生成本地 JD 分析', 'success')
+    } catch (err) {
+      addToast(err.message, 'error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   // ---- Status change ----
   const changeStatus = async (newStatus, label) => {
@@ -134,6 +159,8 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
           </section>
 
           <ScoreDecisionPanel analysis={scoreAnalysis} />
+
+          <JdAiPanel result={aiResult} loading={aiLoading} onAnalyze={runJdAnalysis} projectCount={projectDocs.length} resumeCount={resumes.length} />
 
           {/* Contact */}
           {(job.contactName || job.contactInfo) && (
@@ -435,6 +462,39 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
         </div>
       )}
     </div>
+  )
+}
+
+
+function JdAiPanel({ result, loading, onAnalyze, projectCount, resumeCount }) {
+  return (
+    <section className="rounded-2xl border border-purple-400/20 bg-purple-500/[0.08] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider mb-1">AI JD 分析</h3>
+          <p className="text-sm text-white/70">结合 JD、评分标准、{resumeCount} 份简历和 {projectCount} 个项目，生成简历建议、项目匹配和面试问题。</p>
+        </div>
+        <button onClick={onAnalyze} disabled={loading} className="btn-secondary px-4 py-2 rounded-xl text-sm disabled:opacity-50">
+          {loading ? '分析中...' : '生成 AI 分析'}
+        </button>
+      </div>
+
+      {result && (
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-purple-400/30 bg-purple-500/15 px-3 py-1 text-sm font-semibold text-purple-200">综合 {result.overallScore || '-'} 分</span>
+            <span className="text-xs text-offer-muted">{result.mode === 'ai' ? 'AI 分析' : '本地兜底分析'}</span>
+          </div>
+          <p className="text-sm leading-6 text-white/80">{result.summary}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <MiniList title="简历建议" items={[result.resumeSuggestion, ...(result.resumeCandidates || []).map((r) => `${r.name}：${r.score}分`)].filter(Boolean)} empty="暂无简历建议" tone="cyan" />
+            <MiniList title="推荐项目" items={(result.projectMatches || []).slice(0, 5).map((p) => `${p.title}：${p.score}分 · ${p.recommendation}`)} empty="暂无项目匹配" tone="emerald" />
+            <MiniList title="风险补强" items={result.risks} empty="暂无风险" tone="amber" />
+            <MiniList title="预测问题" items={result.interviewQuestions} empty="暂无预测问题" tone="cyan" />
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -1,8 +1,8 @@
 'use client'
-import { useApp } from '../store/AppContext'
+import { useToasts } from '../store/AppContext'
 
 export default function Toast() {
-  const { toasts } = useApp()
+  const { toasts } = useToasts()
 
   if (toasts.length === 0) return null
 

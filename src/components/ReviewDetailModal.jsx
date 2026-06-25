@@ -45,7 +45,7 @@ function normalizeAttachments(atts) {
 }
 
 export default function ReviewDetailModal({ open, review, onClose, onEdit, onDelete }) {
-  const { reviews: allReviews, addToast, updateReview } = useApp()
+  const { reviews: allReviews, projectDocs, addToast, updateReview } = useApp()
   const liveReview = allReviews.find((r) => r.id === review?.id) || review
 
   const [editingDescId, setEditingDescId] = useState(null)
@@ -81,6 +81,7 @@ export default function ReviewDetailModal({ open, review, onClose, onEdit, onDel
   const negativeTags = Array.isArray(liveReview.negativeTags) ? liveReview.negativeTags : []
   const improvements = Array.isArray(liveReview.improvements) ? liveReview.improvements : []
   const attachments = normalizeAttachments(liveReview.attachments)
+  const linkedProjects = Array.isArray(liveReview.linkedProjectIds) ? liveReview.linkedProjectIds.map((id) => projectDocs.find((p) => p.id === id)).filter(Boolean) : []
 
   const scoreKeys = Object.keys(SCORE_LABELS)
 
@@ -190,6 +191,20 @@ export default function ReviewDetailModal({ open, review, onClose, onEdit, onDel
               </div>
             )}
           </div>
+
+
+
+          {(linkedProjects.length > 0 || liveReview.projectActionNotes) && (
+            <div>
+              <SectionTitle>关联项目准备</SectionTitle>
+              {linkedProjects.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {linkedProjects.map((project) => <span key={project.id} className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-300">{project.title}</span>)}
+                </div>
+              )}
+              {liveReview.projectActionNotes && <p className="text-sm text-white/75 leading-relaxed whitespace-pre-wrap rounded-xl border border-white/10 bg-white/[0.03] p-3">{liveReview.projectActionNotes}</p>}
+            </div>
+          )}
 
           {/* Multidimensional Scores */}
           {scoreKeys.some((k) => scores[k] != null) && (

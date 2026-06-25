@@ -13,7 +13,7 @@ const RESULT_STYLE = {
 }
 
 export default function Interview() {
-  const { reviews, setReviews, deleteReview, addToast } = useApp()
+  const { reviews, projectDocs, setReviews, deleteReview, addToast } = useApp()
 
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState('全部')
@@ -181,6 +181,18 @@ export default function Interview() {
                       <span key={t} className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-full">{t}</span>
                     ))}
                     {tags.length > 4 && <span className="text-[10px] text-offer-muted">+{tags.length - 4}</span>}
+                  </div>
+                )}
+
+
+
+                {Array.isArray(r.linkedProjectIds) && r.linkedProjectIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {r.linkedProjectIds.slice(0, 3).map((id) => {
+                      const project = projectDocs.find((p) => p.id === id)
+                      return project ? <span key={id} className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">{project.title}</span> : null
+                    })}
+                    {r.linkedProjectIds.length > 3 && <span className="text-[10px] text-offer-muted">+{r.linkedProjectIds.length - 3} 项目</span>}
                   </div>
                 )}
 

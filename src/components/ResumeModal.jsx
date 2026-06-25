@@ -19,10 +19,12 @@ const emptyForm = {
   name: '', version: 'v1.0', target: '', language: '中文', format: 'PDF',
   fileSize: '', tags: [], versionNote: '', fileUrl: '', isDefault: false,
   fileName: '', mimeType: '', hasFile: false,
+  scenario: '', targetCompanies: '', targetJobTypes: '', coreSkills: '', jdKeywords: '',
+  linkedProjectIds: [], deliveryStrategy: '', performanceNotes: '',
 }
 
 export default function ResumeModal({ open, resume, onClose }) {
-  const { addToast, addResume, updateResume } = useApp()
+  const { addToast, addResume, updateResume, projectDocs } = useApp()
   const [form, setForm] = useState(() => resume ? { ...emptyForm, ...resume } : { ...emptyForm })
   const [tagInput, setTagInput] = useState('')
   const [fileName, setFileName] = useState(() => resume?.fileName || '')
@@ -160,7 +162,7 @@ export default function ResumeModal({ open, resume, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay" onClick={onClose}>
-      <div className="modal-panel border w-full max-w-lg mx-4 max-h-[90vh] min-h-0 flex flex-col shadow-2xl shadow-black/40" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-panel border w-full max-w-2xl mx-4 max-h-[90vh] min-h-0 flex flex-col shadow-2xl shadow-black/40" onClick={(e) => e.stopPropagation()}>
         <GlowCard style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }} className="rounded-[22px] w-full max-w-full min-w-0 flex flex-col flex-1">
         <div className="bg-white/90 backdrop-blur-xl dark:bg-transparent dark:backdrop-filter-none rounded-[22px] w-full max-w-full min-w-0 flex flex-col flex-1 min-h-0">
           {/* Header */}
@@ -179,7 +181,7 @@ export default function ResumeModal({ open, resume, onClose }) {
 
             <div className="grid grid-cols-2 gap-4">
               <FormField label="适用岗位方向">
-                <input value={form.target} onChange={set('target')} placeholder="例如：后端/全栈" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+                <input value={form.target} onChange={set('target')} placeholder="例如：嵌入式 Linux / BSP / 驱动" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
               </FormField>
               <FormField label="语言类型">
                 <select value={form.language} onChange={set('language')} className="min-h-[40px] rounded-xl border border-slate-300 bg-gray-950 px-4 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer">
@@ -187,6 +189,40 @@ export default function ResumeModal({ open, resume, onClose }) {
                 </select>
               </FormField>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="适用场景">
+                <input value={form.scenario || ''} onChange={set('scenario')} placeholder="央国企通用 / 私企嵌入式 / BSP驱动" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+              </FormField>
+              <FormField label="目标单位/行业">
+                <input value={form.targetCompanies || ''} onChange={set('targetCompanies')} placeholder="央国企、军工、汽车电子、服务器等" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+              </FormField>
+              <FormField label="目标岗位类型">
+                <input value={form.targetJobTypes || ''} onChange={set('targetJobTypes')} placeholder="嵌入式软件、Linux驱动、BSP、系统软件" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+              </FormField>
+              <FormField label="核心技能关键词">
+                <input value={form.coreSkills || ''} onChange={set('coreSkills')} placeholder="C/C++、Linux、RTOS、I2C/SPI/CAN、调试验证" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="JD 关键词">
+                <input value={form.jdKeywords || ''} onChange={set('jdKeywords')} placeholder="用于 AI 推荐简历版本，多个词用逗号分隔" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20" />
+              </FormField>
+              <FormField label="关联项目">
+                <select multiple value={form.linkedProjectIds || []} onChange={(e) => setForm((p) => ({ ...p, linkedProjectIds: Array.from(e.target.selectedOptions).map((o) => o.value) }))} className="min-h-[92px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20">
+                  {projectDocs.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+                </select>
+              </FormField>
+            </div>
+
+            <FormField label="投递策略/改版说明">
+              <textarea value={form.deliveryStrategy || ''} onChange={set('deliveryStrategy')} rows={2} placeholder="例如：央国企版弱化复杂技术细节，突出稳定性、责任心和文档规范。" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 resize-none" />
+            </FormField>
+
+            <FormField label="效果记录">
+              <textarea value={form.performanceNotes || ''} onChange={set('performanceNotes')} rows={2} placeholder="记录这版简历投递后的反馈、命中岗位、需要继续优化的点。" className="min-h-[40px] w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 resize-none" />
+            </FormField>
 
             {/* Tags */}
             <FormField label="标签">
@@ -251,7 +287,7 @@ export default function ResumeModal({ open, resume, onClose }) {
 
 function FormField({ label, children }) {
   return (
-    <div className={label === '标签' || label === '版本说明' || label === '文件上传' ? 'col-span-2' : ''}>
+    <div className={['标签', '版本说明', '文件上传', '投递策略/改版说明', '效果记录'].includes(label) ? 'col-span-2' : ''}>
       <label className="text-xs text-slate-600 dark:text-offer-muted block mb-1">{label}</label>
       {children}
     </div>

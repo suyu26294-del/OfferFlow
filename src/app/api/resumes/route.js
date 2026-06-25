@@ -18,7 +18,7 @@ export async function POST(request) {
   if (!user) return NextResponse.json({ error: '未登录' }, { status: 401 })
 
   const body = await request.json()
-  const { id, name, version, updatedAt, target, language, format, fileSize, tags, versionNote, fileUrl, isDefault, fileName, mimeType, hasFile } = body
+  const { id, name, version, updatedAt, target, language, format, fileSize, tags, versionNote, fileUrl, isDefault, fileName, mimeType, hasFile, scenario, targetCompanies, targetJobTypes, coreSkills, jdKeywords, linkedProjectIds, deliveryStrategy, performanceNotes } = body
 
   const resume = await prisma.resume.create({
     data: {
@@ -38,6 +38,14 @@ export async function POST(request) {
       fileName: fileName || '',
       mimeType: mimeType || '',
       hasFile: hasFile || false,
+      scenario: scenario || '',
+      targetCompanies: targetCompanies || '',
+      targetJobTypes: targetJobTypes || '',
+      coreSkills: coreSkills || '',
+      jdKeywords: jdKeywords || '',
+      linkedProjectIds: linkedProjectIds || [],
+      deliveryStrategy: deliveryStrategy || '',
+      performanceNotes: performanceNotes || '',
     },
   })
 

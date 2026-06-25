@@ -61,7 +61,7 @@ function newImprovement() {
 }
 
 export default function ReviewModal({ open, review, onClose }) {
-  const { jobs, reviews, addReview, updateReview, addToast } = useApp()
+  const { jobs, reviews, projectDocs, addReview, updateReview, addToast } = useApp()
 
   const isEdit = !!review
 
@@ -82,6 +82,8 @@ export default function ReviewModal({ open, review, onClose }) {
   const [note, setNote] = useState('')
   const [strengths, setStrengths] = useState('')
   const [weaknesses, setWeaknesses] = useState('')
+  const [linkedProjectIds, setLinkedProjectIds] = useState([])
+  const [projectActionNotes, setProjectActionNotes] = useState('')
 
   // Scores
   const [scores, setScores] = useState({
@@ -140,6 +142,8 @@ export default function ReviewModal({ open, review, onClose }) {
       setNote(review.note || '')
       setStrengths(review.strengths || '')
       setWeaknesses(review.weaknesses || '')
+      setLinkedProjectIds(Array.isArray(review.linkedProjectIds) ? review.linkedProjectIds : [])
+      setProjectActionNotes(review.projectActionNotes || '')
       setScores(review.scores || { expression: 3, jobUnderstanding: 3, projectFamiliarity: 3, businessThinking: 3, technicalAbility: 3, composure: 3, questionQuality: 3, overall: 3 })
       setQuestions(review.questions || [])
       setTags(review.tags || [])
@@ -162,6 +166,8 @@ export default function ReviewModal({ open, review, onClose }) {
       setNote('')
       setStrengths('')
       setWeaknesses('')
+      setLinkedProjectIds([])
+      setProjectActionNotes('')
       setScores({ expression: 3, jobUnderstanding: 3, projectFamiliarity: 3, businessThinking: 3, technicalAbility: 3, composure: 3, questionQuality: 3, overall: 3 })
       setQuestions([])
       setTags([])
@@ -406,6 +412,8 @@ export default function ReviewModal({ open, review, onClose }) {
       positiveTags, negativeTags,
       improvements: improvements.filter((i) => i.action.trim()),
       attachments,
+      linkedProjectIds,
+      projectActionNotes,
       aiAnalysis: aiMetaRef.current ? {
         metadata: aiMetaRef.current,
         userModified: true,
@@ -529,6 +537,24 @@ export default function ReviewModal({ open, review, onClose }) {
 
               <Field label="备注">
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="面试整体记录和感受..."
+                  className="min-h-[40px] w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 resize-none" />
+              </Field>
+            </div>
+          </Section>
+
+          {/* ===== 关联项目准备 ===== */}
+          <Section title="关联项目准备">
+            <div className="space-y-3">
+              <Field label="本场面试涉及/准备的项目">
+                <select multiple value={linkedProjectIds} onChange={(e) => setLinkedProjectIds(Array.from(e.target.selectedOptions).map((o) => o.value))}
+                  className="min-h-[92px] rounded-xl border border-white/10 bg-gray-950 px-4 py-2.5 text-sm font-medium text-white outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 cursor-pointer">
+                  {projectDocs.length === 0 && <option disabled value="" className="bg-gray-950">暂无项目，请先到项目库添加</option>}
+                  {projectDocs.map((project) => <option key={project.id} value={project.id} className="bg-gray-950">{project.title}</option>)}
+                </select>
+                <p className="mt-1.5 text-[11px] text-offer-muted">按住 Ctrl 可多选。这里会帮助你复盘“哪个项目讲得好/讲得不够”。</p>
+              </Field>
+              <Field label="项目准备与改进备注">
+                <textarea value={projectActionNotes} onChange={(e) => setProjectActionNotes(e.target.value)} rows={3} placeholder="例如：MediaStream 被追问线程模型，需要补充环形缓冲和丢帧策略口述；BoardWeaver 需要准备驱动异常恢复案例。"
                   className="min-h-[40px] w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-200 focus:border-purple-400/70 focus:ring-2 focus:ring-purple-500/20 resize-none" />
               </Field>
             </div>
