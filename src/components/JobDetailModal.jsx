@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../store/AppContext'
 import ModalHeader from './ModalHeader'
 import GlowCard from './GlowCard'
+import { evaluateJob, getDimensionLabel, getScoreBadgeClass } from '../lib/jobScoring'
 
 const STATUS_ACTIONS = [
   { status: '已投递', label: '已投递', color: 'border-cyan-200 text-cyan-700 dark:text-cyan-300 bg-cyan-50 hover:bg-cyan-100' },
@@ -33,7 +34,7 @@ function todayStr() {
 }
 
 export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete }) {
-  const { jobs, resumes, addToast, updateJob, addTask, addReview } = useApp()
+  const { jobs, resumes, settings, addToast, updateJob, addTask, addReview } = useApp()
   const job = jobs.find((j) => j.id === jobId)
 
   // Sub-dialog state
@@ -54,6 +55,7 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
   if (!open || !job) return null
 
   const resumeName = resumes.find((r) => r.id === job.resumeId)
+  const scoreAnalysis = evaluateJob(job, settings)
 
   // ---- Status change ----
   const changeStatus = async (newStatus, label) => {
@@ -100,7 +102,7 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-overlay" onClick={onClose}>
-      <div className="modal-panel border w-full max-w-lg mx-4 max-h-[85vh] min-h-0 flex flex-col shadow-2xl shadow-black/40" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-panel border w-full max-w-2xl mx-4 max-h-[85vh] min-h-0 flex flex-col shadow-2xl shadow-black/40" onClick={(e) => e.stopPropagation()}>
         <GlowCard style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: 0 }} className="rounded-[22px] w-full max-w-full min-w-0 flex flex-col flex-1">
         <div className="bg-white/90 backdrop-blur-xl dark:bg-transparent dark:backdrop-filter-none rounded-[22px] w-full max-w-full min-w-0 flex flex-col flex-1 min-h-0">
         {/* Header */}
@@ -130,6 +132,8 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
               <InfoRow label="关联简历" value={resumeName ? `${resumeName.name} (${resumeName.version})` : '-'} />
             </div>
           </section>
+
+          <ScoreDecisionPanel analysis={scoreAnalysis} />
 
           {/* Contact */}
           {(job.contactName || job.contactInfo) && (
@@ -430,6 +434,68 @@ export default function JobDetailModal({ open, jobId, onClose, onEdit, onDelete 
         </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ScoreDecisionPanel({ analysis }) {
+  if (!analysis) return null
+  const dimensions = Object.entries(analysis.dimensions || {})
+  return (
+    <section className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-xs font-semibold text-white/45 uppercase tracking-wider mb-1">岗位决策评分</h3>
+          <p className="text-sm text-white/75">{analysis.level.summary}</p>
+        </div>
+        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${getScoreBadgeClass(analysis.level.tone)}`}>
+          <span className="text-lg font-bold tabular-nums">{analysis.score}</span>
+          <span className="text-xs font-medium">{analysis.level.label}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 mb-4">
+        {dimensions.map(([key, value]) => (
+          <DimensionBar key={key} label={getDimensionLabel(key)} score={value.score} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <MiniList title="匹配理由" items={analysis.reasons} empty="暂无明显匹配理由" tone="emerald" />
+        <MiniList title="风险提示" items={analysis.risks} empty="暂无明显风险" tone="amber" />
+        <MiniList title="准备建议" items={analysis.suggestions} empty="暂无建议" tone="cyan" />
+      </div>
+    </section>
+  )
+}
+
+function DimensionBar({ label, score }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-white/55">{label}</span>
+        <span className="text-xs font-semibold text-white tabular-nums">{score}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div className="h-full rounded-full bg-gradient-to-r from-purple-400 to-cyan-300" style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function MiniList({ title, items, empty, tone }) {
+  const color = tone === 'emerald' ? 'text-emerald-300' : tone === 'cyan' ? 'text-cyan-300' : 'text-amber-300'
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+      <p className={`text-xs font-semibold mb-2 ${color}`}>{title}</p>
+      <ul className="space-y-1.5">
+        {(items && items.length ? items : [empty]).slice(0, 5).map((item, idx) => (
+          <li key={idx} className="text-xs leading-relaxed text-white/65 flex gap-1.5">
+            <span className="mt-1 h-1 w-1 rounded-full bg-white/35 shrink-0" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

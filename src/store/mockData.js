@@ -1,3 +1,5 @@
+import { DEFAULT_SCORING_CONFIG } from '../lib/jobScoring'
+
 export const defaultSettings = {
   name: '张同学',
   email: 'zhang@example.com',
@@ -7,6 +9,7 @@ export const defaultSettings = {
   workType: '全职',
   notifyInterview: true,
   notifyProgress: true,
+  jobScoring: DEFAULT_SCORING_CONFIG,
 }
 
 const id = () => crypto.randomUUID()

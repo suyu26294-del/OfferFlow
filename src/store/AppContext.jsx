@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { generateMockData, defaultSettings } from './mockData'
+import { normalizeScoringConfig } from '../lib/jobScoring'
 import { deleteReviewAttachmentsByReviewId } from '../utils/reviewAttachmentStore'
 import Toast from '../components/Toast'
 import { useAuth } from './AuthContext'
@@ -143,6 +144,15 @@ function saveToStorage(key, data) {
   } catch { /* ignore */ }
 }
 
+function settingsStorageKey(userId) {
+  return userId ? `offerFlow_settings_${userId}` : 'offerFlow_settings'
+}
+
+function normalizeSettings(value = {}) {
+  const merged = { ...defaultSettings, ...(value || {}) }
+  return { ...merged, jobScoring: normalizeScoringConfig(merged) }
+}
+
 export function AppProvider({ children }) {
   const { user, loading: authLoading } = useAuth()
 
@@ -152,7 +162,7 @@ export function AppProvider({ children }) {
   const [reviews, setReviewsRaw] = useState([])
   const [settings, setSettingsRaw] = useState(() => {
     if (typeof window === 'undefined') return defaultSettings
-    return loadFromStorage('offerFlow_settings', defaultSettings)
+    return normalizeSettings(loadFromStorage('offerFlow_settings', defaultSettings))
   })
   const [dataLoading, setDataLoading] = useState(true)
   const [toasts, setToasts] = useState([])
@@ -174,11 +184,12 @@ export function AppProvider({ children }) {
   async function loadAllData() {
     setDataLoading(true)
     try {
-      let [j, r, t, rv] = await Promise.all([
+      let [j, r, t, rv, remoteSettings] = await Promise.all([
         apiFetch('/api/jobs'),
         apiFetch('/api/resumes'),
         apiFetch('/api/tasks'),
         apiFetch('/api/reviews'),
+        apiFetch('/api/settings'),
       ])
 
       setJobsRaw(migrateJobs(j))
@@ -186,6 +197,10 @@ export function AppProvider({ children }) {
       setTasksRaw(t)
       setReviewsRaw(rv)
 
+      const nextSettings = normalizeSettings(remoteSettings || loadFromStorage(settingsStorageKey(user?.id), defaultSettings))
+      setSettingsRaw(nextSettings)
+
+      saveToStorage(settingsStorageKey(user?.id), nextSettings)
       saveToStorage('offerFlow_jobs', migrateJobs(j))
       saveToStorage('offerFlow_resumes', r)
       saveToStorage('offerFlow_tasks', t)
@@ -198,6 +213,8 @@ export function AppProvider({ children }) {
         setResumesRaw([])
         setTasksRaw([])
         setReviewsRaw([])
+        const nextSettings = normalizeSettings(loadFromStorage('offerFlow_settings', defaultSettings))
+        setSettingsRaw(nextSettings)
       } else {
         console.error('[AppContext] API load failed, falling back to localStorage', err)
         addToast('数据加载失败，使用本地缓存', 'error')
@@ -206,6 +223,7 @@ export function AppProvider({ children }) {
         setResumesRaw(loadFromStorage('offerFlow_resumes', mock.resumes))
         setTasksRaw(loadFromStorage('offerFlow_tasks', mock.tasks))
         setReviewsRaw(loadFromStorage('offerFlow_reviews', mock.reviews))
+        setSettingsRaw(normalizeSettings(loadFromStorage(settingsStorageKey(user?.id), defaultSettings)))
       }
     } finally {
       setDataLoading(false)
@@ -387,14 +405,25 @@ export function AppProvider({ children }) {
     }
   }, [setReviews, addToast])
 
-  // Settings (localStorage only)
+  // Settings: local cache + account-level persistence when logged in
   const setSettings = useCallback((value) => {
     setSettingsRaw((prev) => {
-      const next = typeof value === 'function' ? value(prev) : value
-      saveToStorage('offerFlow_settings', next)
+      const next = normalizeSettings(typeof value === 'function' ? value(prev) : value)
+      saveToStorage(settingsStorageKey(user?.id), next)
+      if (!user?.id) saveToStorage('offerFlow_settings', next)
+
+      if (user?.id) {
+        apiFetch('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ settings: next }),
+        }).catch((err) => {
+          console.error('[AppContext] settings persistence failed', err)
+          addToast('设置已保存到本地，但同步到账户失败', 'error')
+        })
+      }
       return next
     })
-  }, [])
+  }, [user?.id, addToast])
 
   return (
     <AppContext.Provider value={{
